@@ -4,6 +4,8 @@ Nextend Broker Platform packages the Java broker and the WebTransport sidecar as
 
 The repository is set up for three practical workflows: local development with Docker Compose, Kubernetes deployment through Helm, and CI validation of the broker-sidecar contract.
 
+This standalone repository is the source of truth for broker-platform documentation, release assets, and examples.
+
 ## Repository layout
 
 ```text
@@ -158,6 +160,8 @@ console.log({ brokerUrl, brokerCertHash, token });
 That gives a browser application the three pieces it needs to start a WebTransport-based session against the sidecar: the `wts://` URL, the broker certificate hash, and a broker-issued JWT.
 
 The existing `rsocket-broker-client-js` package in the wider workspace remains the reference for broker metadata conventions and requester interaction models. For browser-facing WebTransport clients, the broker platform itself is the source of truth for the connection hint and auth-token endpoints above.
+
+There is also a runnable static example at `examples/browser-bootstrap` that fetches both endpoints, shows the returned JSON, and builds a launch URL from the broker hint and certificate hash.
 
 ## Kubernetes usage
 

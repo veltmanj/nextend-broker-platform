@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Broker Browser Bootstrap</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Nextend Broker Platform</p>
+        <h1>Browser Bootstrap Example</h1>
+        <p class="lede">
+          Fetch the broker WebTransport info and auth token endpoints, then reuse the
+          returned values in your own browser client.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <label class="field">
+          <span>Broker base URL</span>
+          <input id="brokerBaseUrl" type="url" value="http://localhost:6933" />
+        </label>
+
+        <div class="actions">
+          <button id="fetchButton" type="button">Fetch bootstrap data</button>
+          <button id="copyButton" type="button" class="secondary">Copy launch URL</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite">Ready.</p>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Broker Info</h2>
+          <dl class="facts">
+            <div>
+              <dt>Browser URL</dt>
+              <dd id="browserUrlHint">-</dd>
+            </div>
+            <div>
+              <dt>Certificate hash</dt>
+              <dd id="brokerCertHash">-</dd>
+            </div>
+            <div>
+              <dt>Transport path</dt>
+              <dd id="transportPath">-</dd>
+            </div>
+          </dl>
+          <pre id="infoJson" class="code">{}</pre>
+        </article>
+
+        <article class="panel">
+          <h2>Issued Token</h2>
+          <dl class="facts">
+            <div>
+              <dt>Scope</dt>
+              <dd id="tokenScope">-</dd>
+            </div>
+            <div>
+              <dt>Expires at</dt>
+              <dd id="tokenExpiresAt">-</dd>
+            </div>
+          </dl>
+          <label class="field compact" for="tokenValue">
+            <span>Token value</span>
+          </label>
+          <textarea id="tokenValue" class="token" readonly spellcheck="false"></textarea>
+          <pre id="tokenJson" class="code">{}</pre>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Launch URL</h2>
+        <p class="hint">
+          This is a convenient query string you can pass into another browser page or test
+          harness.
+        </p>
+        <label class="field compact" for="launchUrl">
+          <span>Launch URL</span>
+        </label>
+        <textarea id="launchUrl" class="token" readonly spellcheck="false"></textarea>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
