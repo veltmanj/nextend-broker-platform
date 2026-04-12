@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOME_DIR="${HOME:-}"
 
 find_repo() {
   local env_value="$1"
@@ -42,17 +43,24 @@ run_gradle_publish() {
 
 RSOCKET_JAVA_REPO="$({
   find_repo "${RSOCKET_JAVA_REPO:-}" \
-    "/Users/jeroenveltman/Documents/rsocket-java" \
     "${ROOT_DIR}/../rsocket-java" \
-    "${ROOT_DIR}/../../rsocket-java"
+    "${ROOT_DIR}/../../rsocket-java" \
+    "${HOME_DIR:+${HOME_DIR}/Documents/rsocket-java}" \
+    "${HOME_DIR:+${HOME_DIR}/src/rsocket-java}" \
+    "${HOME_DIR:+${HOME_DIR}/projects/rsocket-java}" \
+    "${HOME_DIR:+${HOME_DIR}/code/rsocket-java}"
 } || true)"
 
 RSOCKET_BROKER_REPO="$({
   find_repo "${RSOCKET_BROKER_REPO:-}" \
-    "/Users/jeroenveltman/Documents/nextend-app-components/rsocket-broker" \
-    "/Users/jeroenveltman/Documents/dbs-projects/rsocket-broker" \
+    "${ROOT_DIR}/../nextend-app-components/rsocket-broker" \
+    "${ROOT_DIR}/../../nextend-app-components/rsocket-broker" \
     "${ROOT_DIR}/../rsocket-broker" \
-    "${ROOT_DIR}/../../rsocket-broker"
+    "${ROOT_DIR}/../../rsocket-broker" \
+    "${HOME_DIR:+${HOME_DIR}/Documents/rsocket-broker}" \
+    "${HOME_DIR:+${HOME_DIR}/src/rsocket-broker}" \
+    "${HOME_DIR:+${HOME_DIR}/projects/rsocket-broker}" \
+    "${HOME_DIR:+${HOME_DIR}/code/rsocket-broker}"
 } || true)"
 
 if [[ -z "${RSOCKET_JAVA_REPO}" ]]; then

@@ -24,16 +24,19 @@ If you have the producer repositories checked out locally, run:
 bash scripts/bootstrap-broker-prereqs.sh
 ```
 
-The bootstrap script looks for these local repositories by default:
+The bootstrap script checks these locations in order:
 
-- `/Users/jeroenveltman/Documents/rsocket-java`
-- `/Users/jeroenveltman/Documents/nextend-app-components/rsocket-broker`
-- `/Users/jeroenveltman/Documents/dbs-projects/rsocket-broker`
+- `RSOCKET_JAVA_REPO` and `RSOCKET_BROKER_REPO` if you set them explicitly
+- Repository siblings such as `../rsocket-java`, `../../rsocket-java`, `../rsocket-broker`, and `../../rsocket-broker`
+- Common home-directory checkouts such as `~/Documents/rsocket-java`, `~/src/rsocket-java`, `~/projects/rsocket-java`, `~/code/rsocket-java`, and the matching `rsocket-broker` paths
 
-You can override detection with:
+If your local checkout layout differs from those defaults, set the repository paths explicitly:
 
-- `RSOCKET_JAVA_REPO=/path/to/rsocket-java`
-- `RSOCKET_BROKER_REPO=/path/to/rsocket-broker`
+```bash
+RSOCKET_JAVA_REPO=/path/to/rsocket-java \
+RSOCKET_BROKER_REPO=/path/to/rsocket-broker \
+bash scripts/bootstrap-broker-prereqs.sh
+```
 
 Use `DRY_RUN=1 bash scripts/bootstrap-broker-prereqs.sh` to verify the detected paths without publishing artifacts.
 

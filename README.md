@@ -1,62 +1,127 @@
 # Nextend Broker Platform
 
-Standalone product scaffold for the Nextend broker and WebTransport sidecar.
+Nextend Broker Platform packages the Java broker and the WebTransport sidecar as one deployable product. The broker stays responsible for routing, authentication, and lifecycle management, while the sidecar handles browser-facing QUIC, HTTP/3, TLS, and WebTransport traffic.
 
-This repository now contains an extracted broker tree and an extracted WebTransport sidecar tree from the current workspace. It turns the current broker plus native sidecar approach into a product boundary that can be documented, versioned, deployed, and released as `1.0.0`.
-
-## Product scope
-
-- Java broker remains the control plane for routing, auth, and broker lifecycle.
-- WebTransport sidecar terminates browser-facing QUIC, TLS, HTTP/3, and WebTransport.
-- Both components are versioned and released together as one product line.
-- Local development, container deployment, and Kubernetes deployment are first-class use cases.
+The repository is set up for three practical workflows: local development with Docker Compose, Kubernetes deployment through Helm, and CI validation of the broker-sidecar contract.
 
 ## Repository layout
 
 ```text
 broker/                      Java broker source and packaging
-sidecar/                     Native/WebTransport sidecar source and packaging
-deploy/helm/                 Kubernetes chart for a broker + sidecar pod
+sidecar/                     WebTransport sidecar source and packaging
+deploy/helm/                 Helm chart for a broker + sidecar deployment
 docs/adr/                    Architecture decisions
 docs/release/                Release planning and release notes
-docker-compose.yml           Local and CI deployment topology
+docker-compose.yml           Local runtime topology
 .env.example                 Environment contract for local runs
+scripts/                     Validation, bootstrap, and smoke-test helpers
 ```
 
-## Runtime topology
+## How the platform is meant to run
 
-The default production topology is a single workload with two containers:
+The default topology is a broker container plus a sidecar container.
 
-- `broker`: Java process exposing internal broker transports and management endpoints.
-- `sidecar`: browser-facing WebTransport terminator that forwards accepted streams into the broker over a local contract.
+- The broker exposes internal transports and management endpoints.
+- The sidecar exposes the browser-facing WebTransport endpoint and bridges accepted sessions into the broker over H3.
+- The broker validates the sidecar admin contract before accepting traffic in companion mode.
 
-For local development, the same topology can run through `docker compose` with separate containers on one network.
+For local work, `docker compose` starts the same two-container topology on a single network. For Kubernetes, the Helm chart wires the same pairing into one workload.
 
-## Design goals for `1.0.0`
+## Prerequisites
 
-- Stable and documented broker-sidecar contract.
-- Clear configuration precedence and environment variables.
-- Separate broker and sidecar images.
-- Kubernetes and Docker Compose deployment assets in-repo.
-- Structured health, readiness, metrics, and logs.
-- Release automation and version compatibility policy.
+- Docker with Compose support
+- Java 17 for local broker packaging
+- Maven for local broker packaging
+- Node.js if you want to run or build the sidecar outside Docker
+- Local producer checkouts for `rsocket-java` and `rsocket-broker` if the required Maven artifacts are not already in `~/.m2`
 
-## Quick start
+## Local quick start
 
-1. Copy `.env.example` to `.env` and set secrets.
-2. Build the broker and sidecar images with `docker compose build`.
-3. Start the stack with `docker compose up`.
-4. Verify broker health and sidecar readiness.
-5. Run `bash scripts/compose-smoke-test.sh` for the repository smoke test.
+1. Copy `.env.example` to `.env`.
+2. Set at least `APP_SECURITY_JWT_SKEY` and any path or port overrides you need.
+3. Check whether the required broker prerequisites are already installed:
 
-The smoke test currently assumes the broker can be packaged from a locally built jar, which means the required custom Maven artifacts must already exist in your local Maven repository.
+```bash
+bash scripts/check-broker-prereqs.sh
+```
 
-Run `bash scripts/check-broker-prereqs.sh` first if you want to validate that prerequisite explicitly.
-Run `bash scripts/bootstrap-broker-prereqs.sh` if you have local `rsocket-java` and `rsocket-broker` source checkouts and want to publish the required artifacts into `~/.m2` automatically.
+1. If the prerequisite check fails, publish the required producer artifacts into your local Maven repository:
 
-The Helm service template at `deploy/helm/nextend-broker-platform/templates/service.yaml` is intentionally excluded in `.prettierignore` because formatter drift kept rewriting Helm delimiters into invalid spaced braces.
+```bash
+bash scripts/bootstrap-broker-prereqs.sh
+```
 
-Run `bash scripts/install-git-hooks.sh` if you want a local pre-commit guard that runs `bash scripts/check-helm-templates.sh` and `bash scripts/check-compose-config.sh` before each commit.
+1. Start the stack:
+
+```bash
+docker compose up --build
+```
+
+1. Validate the runtime:
+
+```bash
+curl -fsS http://localhost:6933/actuator/health
+curl -fsS http://localhost:9090/readyz
+```
+
+1. Run the repository smoke test when you want an end-to-end check:
+
+```bash
+bash scripts/compose-smoke-test.sh
+```
+
+## Bootstrap behavior
+
+`scripts/bootstrap-broker-prereqs.sh` resolves producer repositories in this order:
+
+1. `RSOCKET_JAVA_REPO` and `RSOCKET_BROKER_REPO` if you set them explicitly
+2. Common sibling directories next to this repository, such as `../rsocket-java` and `../rsocket-broker`
+3. Common home-directory checkouts, such as `~/Documents`, `~/src`, `~/projects`, and `~/code`
+
+If your checkouts live elsewhere, pass them explicitly:
+
+```bash
+RSOCKET_JAVA_REPO=/path/to/rsocket-java \
+RSOCKET_BROKER_REPO=/path/to/rsocket-broker \
+bash scripts/bootstrap-broker-prereqs.sh
+```
+
+Use `DRY_RUN=1 bash scripts/bootstrap-broker-prereqs.sh` to verify detection without publishing artifacts.
+
+## Useful commands
+
+```bash
+bash scripts/check-broker-prereqs.sh
+bash scripts/bootstrap-broker-prereqs.sh
+bash scripts/check-helm-templates.sh
+bash scripts/check-compose-config.sh
+bash scripts/compose-smoke-test.sh
+bash scripts/install-git-hooks.sh
+```
+
+`scripts/install-git-hooks.sh` configures a local pre-commit guard that runs the Helm template and Compose validation checks before each commit.
+
+## Runtime defaults
+
+- Broker H3 endpoint: `h3://localhost:7171/rsocket`
+- Browser-facing WebTransport endpoint: `https://localhost:7443/broker/wt`
+- Broker health endpoint: `http://localhost:6933/actuator/health`
+- Sidecar readiness endpoint: `http://localhost:9090/readyz`
+- Sidecar info endpoint: `http://localhost:9090/info`
+
+See `docs/configuration.md` for the full environment-variable reference.
+
+## Kubernetes usage
+
+The Helm chart lives under `deploy/helm/nextend-broker-platform`.
+
+Validate the rendered manifests locally with:
+
+```bash
+helm template nextend-broker-platform deploy/helm/nextend-broker-platform
+```
+
+The Helm service template at `deploy/helm/nextend-broker-platform/templates/service.yaml` is intentionally excluded in `.prettierignore` because formatter drift can corrupt Helm delimiters.
 
 ## Documentation index
 
@@ -66,19 +131,17 @@ Run `bash scripts/install-git-hooks.sh` if you want a local pre-commit guard tha
 - Local build prerequisites: `docs/local-build-prerequisites.md`
 - Release 1.0.0 plan: `docs/release/1.0.0-plan.md`
 
-## Current state
+## Current status
 
-The main product extraction and contract hardening work is complete:
+- The broker and sidecar source trees are extracted and runnable from this repository.
+- The broker-sidecar admin contract is implemented and validated in code.
+- Local bootstrap and Compose smoke scripts validate the end-to-end path.
+- Hosted CI validates sidecar syntax and deployment manifest rendering.
+- Self-hosted CI handles broker compilation and end-to-end smoke because the broker still depends on locally published producer artifacts.
 
-1. The broker build and source tree live under `broker/`.
-2. The sidecar package and runtime source live under `sidecar/`.
-3. The broker-sidecar admin contract is implemented and validated in code.
-4. Local bootstrap and Compose smoke scripts now validate the end-to-end path.
-5. Hosted CI covers sidecar syntax plus deployment manifest rendering, while broker compile and end-to-end smoke run in the self-hosted workflow that can bootstrap the required Maven artifacts.
-
-The next productization steps are:
+## Remaining product work
 
 1. Make broker dependency resolution reproducible from a published Maven source instead of local cache bootstrap.
 2. Add Kubernetes runtime smoke coverage beyond template rendering.
-3. Cut pre-release tags until the deployment matrix is green.
-4. Release `1.0.0` once the gates in the release plan are met.
+3. Keep cutting prereleases until the deployment matrix is stable.
+4. Release `1.0.0` once the release plan gates are met.
