@@ -62,4 +62,4 @@ To make the broker build reproducible outside local development, one of these ne
 2. Replace the snapshot broker dependencies with released coordinates.
 3. Vendor or composite-build the required producer projects as part of this repository.
 
-Until then, hosted CI should validate syntax, compilation, and manifest rendering, while end-to-end smoke remains a local or self-hosted runner responsibility.
+Until then, hosted CI should validate sidecar syntax and deployment manifest rendering, while broker compilation and end-to-end smoke remain a local or self-hosted runner responsibility.

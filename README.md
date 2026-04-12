@@ -74,7 +74,7 @@ The main product extraction and contract hardening work is complete:
 2. The sidecar package and runtime source live under `sidecar/`.
 3. The broker-sidecar admin contract is implemented and validated in code.
 4. Local bootstrap and Compose smoke scripts now validate the end-to-end path.
-5. Hosted CI covers compile, syntax, and manifest rendering, while self-hosted smoke is isolated in its own workflow.
+5. Hosted CI covers sidecar syntax plus deployment manifest rendering, while broker compile and end-to-end smoke run in the self-hosted workflow that can bootstrap the required Maven artifacts.
 
 The next productization steps are:
 

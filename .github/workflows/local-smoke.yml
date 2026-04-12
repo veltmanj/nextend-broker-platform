@@ -9,13 +9,23 @@ on:
 jobs:
   local-smoke:
     runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - name: Validate Helm templates
         run: bash scripts/check-helm-templates.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Bootstrap broker local Maven prerequisites
         run: bash scripts/bootstrap-broker-prereqs.sh
       - name: Check broker local Maven prerequisites
         run: bash scripts/check-broker-prereqs.sh
+      - name: Compile broker tests
+        working-directory: broker
+        run: mvn -q test-compile
       - name: Run Compose smoke test
         run: bash scripts/compose-smoke-test.sh
