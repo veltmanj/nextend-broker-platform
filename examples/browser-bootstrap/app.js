@@ -1,5 +1,6 @@
 const brokerBaseUrlInput = document.querySelector('#brokerBaseUrl');
 const fetchButton = document.querySelector('#fetchButton');
+const probeButton = document.querySelector('#probeButton');
 const copyButton = document.querySelector('#copyButton');
 const statusNode = document.querySelector('#status');
 
@@ -13,6 +14,13 @@ const tokenExpiresAtNode = document.querySelector('#tokenExpiresAt');
 const tokenValueNode = document.querySelector('#tokenValue');
 const tokenJsonNode = document.querySelector('#tokenJson');
 const launchUrlNode = document.querySelector('#launchUrl');
+const probeStatusNode = document.querySelector('#probeStatus');
+const probeUrlNode = document.querySelector('#probeUrl');
+const probeLogNode = document.querySelector('#probeLog');
+
+let latestInfo = null;
+let latestTokenResponse = null;
+let latestProbeLog = [];
 
 function setStatus(message, type = 'idle') {
   statusNode.textContent = message;
@@ -21,6 +29,35 @@ function setStatus(message, type = 'idle') {
 
 function normalizeBaseUrl(value) {
   return value.replace(/\/$/, '');
+}
+
+function appendProbeLog(message, extra = undefined) {
+  latestProbeLog = [
+    ...latestProbeLog,
+    {
+      at: new Date().toISOString(),
+      message,
+      ...(extra ? { extra } : {}),
+    },
+  ];
+  probeLogNode.textContent = JSON.stringify(latestProbeLog, null, 2);
+}
+
+function setProbeState(message, url = '-') {
+  probeStatusNode.textContent = message;
+  probeUrlNode.textContent = url || '-';
+}
+
+function parseCertificateHash(value) {
+  const compact = value.replaceAll(':', '').trim();
+
+  if (!compact || compact.length % 2 !== 0) {
+    throw new Error('The broker certificate hash is missing or malformed.');
+  }
+
+  return Uint8Array.from(
+    compact.match(/.{1,2}/g).map((pair) => Number.parseInt(pair, 16))
+  );
 }
 
 async function fetchJson(url) {
@@ -38,6 +75,7 @@ async function fetchJson(url) {
 }
 
 function renderInfo(info) {
+  latestInfo = info;
   browserUrlHintNode.textContent = info.browserUrlHint ?? '-';
   brokerCertHashNode.textContent = info.brokerCertHash ?? '-';
   transportPathNode.textContent = info.path ?? '-';
@@ -45,6 +83,7 @@ function renderInfo(info) {
 }
 
 function renderToken(tokenResponse) {
+  latestTokenResponse = tokenResponse;
   tokenScopeNode.textContent = tokenResponse.scope ?? '-';
   tokenExpiresAtNode.textContent = tokenResponse.expiresAt ?? '-';
   tokenValueNode.value = tokenResponse.token ?? '';
@@ -77,8 +116,12 @@ async function loadBootstrapData() {
   }
 
   fetchButton.disabled = true;
+  probeButton.disabled = true;
   copyButton.disabled = true;
   setStatus('Fetching broker bootstrap data...', 'loading');
+  latestProbeLog = [];
+  probeLogNode.textContent = '[]';
+  setProbeState('Not started.');
 
   try {
     const [info, tokenResponse] = await Promise.all([
@@ -90,6 +133,7 @@ async function loadBootstrapData() {
     renderToken(tokenResponse);
     renderLaunchUrl(info, tokenResponse);
 
+    probeButton.disabled = !(latestInfo?.browserUrlHint && latestInfo?.brokerCertHash);
     copyButton.disabled = !launchUrlNode.value;
     setStatus('Bootstrap data loaded.', 'success');
   } catch (error) {
@@ -97,6 +141,82 @@ async function loadBootstrapData() {
     setStatus(error.message, 'error');
   } finally {
     fetchButton.disabled = false;
+  }
+}
+
+async function probeWebTransport() {
+  if (!('WebTransport' in globalThis)) {
+    setStatus('This browser does not expose the WebTransport API.', 'error');
+    setProbeState('WebTransport is not available in this browser.');
+    return;
+  }
+
+  if (!latestInfo?.browserUrlHint || !latestInfo?.brokerCertHash) {
+    setStatus('Fetch broker data before probing the WebTransport session.', 'error');
+    setProbeState('Missing bootstrap data.');
+    return;
+  }
+
+  probeButton.disabled = true;
+  setProbeState('Connecting...', latestInfo.browserUrlHint);
+  appendProbeLog('Starting WebTransport probe.', {
+    url: latestInfo.browserUrlHint,
+    scope: latestTokenResponse?.scope ?? null,
+  });
+
+  let transport;
+
+  try {
+    transport = new WebTransport(latestInfo.browserUrlHint, {
+      serverCertificateHashes: [
+        {
+          algorithm: 'sha-256',
+          value: parseCertificateHash(latestInfo.brokerCertHash),
+        },
+      ],
+    });
+
+    await transport.ready;
+    appendProbeLog('Session ready.');
+
+    const stream = await transport.createBidirectionalStream();
+    appendProbeLog('Bidirectional stream opened.');
+
+    const writer = stream.writable.getWriter();
+    await writer.close();
+    writer.releaseLock();
+    appendProbeLog('Closed outgoing stream without sending frames.');
+
+    const reader = stream.readable.getReader();
+    await reader.cancel('probe complete');
+    reader.releaseLock();
+    appendProbeLog('Cancelled incoming stream reader.');
+
+    transport.close({ closeCode: 0, reason: 'probe complete' });
+    await transport.closed.catch(() => undefined);
+    appendProbeLog('Transport closed cleanly.');
+
+    setProbeState(
+      'Success. Real session and bidirectional stream opened.',
+      latestInfo.browserUrlHint
+    );
+    setStatus('WebTransport probe succeeded.', 'success');
+  } catch (error) {
+    console.error(error);
+    appendProbeLog('Probe failed.', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    setProbeState(
+      `Failed: ${error instanceof Error ? error.message : String(error)}`,
+      latestInfo.browserUrlHint
+    );
+    setStatus(error instanceof Error ? error.message : String(error), 'error');
+
+    if (transport) {
+      transport.close({ closeCode: 1, reason: 'probe failed' });
+    }
+  } finally {
+    probeButton.disabled = false;
   }
 }
 
@@ -116,5 +236,7 @@ async function copyLaunchUrl() {
 }
 
 fetchButton.addEventListener('click', loadBootstrapData);
+probeButton.addEventListener('click', probeWebTransport);
 copyButton.addEventListener('click', copyLaunchUrl);
 copyButton.disabled = true;
+probeButton.disabled = true;

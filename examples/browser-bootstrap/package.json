@@ -1,0 +1,8 @@
+{
+  "name": "broker-browser-bootstrap-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node server.mjs"
+  }
+}

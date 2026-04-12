@@ -161,7 +161,7 @@ That gives a browser application the three pieces it needs to start a WebTranspo
 
 The existing `rsocket-broker-client-js` package in the wider workspace remains the reference for broker metadata conventions and requester interaction models. For browser-facing WebTransport clients, the broker platform itself is the source of truth for the connection hint and auth-token endpoints above.
 
-There is also a runnable static example at `examples/browser-bootstrap` that fetches both endpoints, shows the returned JSON, and builds a launch URL from the broker hint and certificate hash.
+There is also a runnable browser example at `examples/browser-bootstrap` that fetches both endpoints, shows the returned JSON, builds a launch URL from the broker hint and certificate hash, and probes a real WebTransport session by opening a bidirectional stream.
 
 ## Kubernetes usage
 

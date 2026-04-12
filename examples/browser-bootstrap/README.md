@@ -1,18 +1,20 @@
 # Browser Bootstrap Example
 
-This example is a small static frontend that reads the broker-platform bootstrap endpoints:
+This example is a small browser frontend that reads the broker-platform bootstrap endpoints and then opens a real WebTransport session probe:
 
 - `GET /broker/wt/info`
 - `GET /broker/auth/token`
+- `wts://.../broker/wt` session probe with one bidirectional stream
 
-It does not require a build step. Serve the directory with any static file server and open it in a browser.
+It does not require a build step. A tiny Node server is included so you can serve the page locally over HTTP and HTTPS and proxy `/broker/*` requests back to the broker management port.
 
 ## Local usage
 
-1. Configure the broker to allow the example origin. For example, if you will serve the page from `http://localhost:8080`, set this in your `.env` file before starting Docker Compose:
+1. Configure the broker to allow the example origin. For example, if you will serve the page from `http://localhost:8080` or `https://localhost:8443`, set these in your `.env` file before starting Docker Compose:
 
 ```bash
 BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_0=http://localhost:8080
+BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_1=https://localhost:8443
 ```
 
 1. Start the broker platform:
@@ -21,16 +23,20 @@ BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_0=http://localhost:8080
 docker compose up --build
 ```
 
-1. Serve this example directory:
+1. Start the local example server:
 
 ```bash
 cd examples/browser-bootstrap
-python3 -m http.server 8080
+node server.mjs
 ```
 
-1. Open `http://localhost:8080` in your browser.
+1. Open `http://localhost:8080` or `https://localhost:8443` in your browser.
 
-The page fetches the broker info and auth-token endpoints from `http://localhost:6933` by default. If your broker runs elsewhere, change the base URL in the form.
+The local example server proxies `/broker/*` requests to `http://localhost:6933` by default, so the page works on either origin without mixed-content issues. If your broker runs elsewhere, set `BROKER_BASE_URL` when you start the server:
+
+```bash
+BROKER_BASE_URL=http://localhost:16933 node server.mjs
+```
 
 ## What it shows
 
@@ -39,3 +45,10 @@ The page fetches the broker info and auth-token endpoints from `http://localhost
 - issued JWT token
 - token expiry and scope
 - a composed launch URL you can pass into downstream client pages
+- a live WebTransport connectivity probe that opens a bidirectional stream
+
+## Notes
+
+- The session probe validates browser-to-sidecar connectivity and stream creation. It does not send application RSocket frames.
+- `server.mjs` tries to generate a local self-signed certificate with `openssl` for the HTTPS listener if you do not provide `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH`.
+- If you only want the HTTP listener, start the server with `ENABLE_HTTPS=0 node server.mjs`.
