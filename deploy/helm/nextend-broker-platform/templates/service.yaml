@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nextend-broker-platform.fullname" . }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ include "nextend-broker-platform.fullname" . }}
+  ports:
+    - name: h3
+      port: {{ .Values.broker.service.h3Port }}
+      targetPort: h3
+      protocol: UDP
+    - name: webtransport
+      port: {{ .Values.sidecar.service.webtransportPort }}
+      targetPort: wt
+      protocol: UDP

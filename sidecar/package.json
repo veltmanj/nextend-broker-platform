@@ -1,0 +1,22 @@
+{
+  "name": "nextend-broker-webtransport-native",
+  "version": "1.0.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "nextend-broker-webtransport-native": "./src/server.mjs"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "start:dev": "node src/server.mjs",
+    "check:syntax": "node --check src/server.mjs"
+  },
+  "dependencies": {
+    "@currentspace/http3": "^0.7.1",
+    "@fails-components/webtransport": "^1.6.1",
+    "@fails-components/webtransport-transport-http3-quiche": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

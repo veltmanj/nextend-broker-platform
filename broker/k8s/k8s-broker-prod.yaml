@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: broker-cm
+data:
+  # if you want to deploy n instances of eureka cluster,
+  # you should set eureka_service_address: http://eureka-0.eureka:8761/eureka,...,http://eureka-(n-1).eureka:8761/eureka
+  eureka_service_address: http://eureka-0.eureka:8761/eureka,http://eureka-1.eureka:8761/eureka,http://eureka-2.eureka:8761/eureka
+  broker_address: ws://${HOSTNAME}.broker:6935
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nextend-jwt
+type: Opaque
+stringData:
+  APP_SECURITY_JWT_SKEY: "replace-with-a-hex-encoded-hs512-secret"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-np
+  labels:
+    app: broker
+spec:
+  type: NodePort
+  ports:
+    - port: 6934
+      nodePort: 30034
+      name: broker
+    - port: 6935
+      nodePort: 30035
+      name: cluster
+    - port: 7171
+      nodePort: 30171
+      name: h3
+      protocol: UDP
+    - port: 6933
+      nodePort: 30033
+      name: http
+  selector:
+    app: broker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker
+  labels:
+    app: broker
+spec:
+  clusterIP: None
+  ports:
+    - port: 6934
+      name: broker
+    - port: 7171
+      name: h3
+      protocol: UDP
+  selector:
+    app: broker
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: broker
+spec:
+  serviceName: "broker"
+  # n instances
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broker
+  template:
+    metadata:
+      labels:
+        app: broker
+    spec:
+      containers:
+        - name: broker
+          image: nextend/broker
+          ports:
+            - containerPort: 6933
+            - containerPort: 6934
+            - containerPort: 6935
+            - containerPort: 7171
+              protocol: UDP
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          env:
+            - name: BROKER_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: broker-cm
+                  key: broker_address
+            - name: EUREKA_SERVER_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: eureka-cm
+                  key: eureka_service_address
+            - name: APP_SECURITY_JWT_SKEY
+              valueFrom:
+                secretKeyRef:
+                  name: nextend-jwt
+                  key: APP_SECURITY_JWT_SKEY
+            - name: ENVIRONMENT
+              value: "prod"
+            - name: APP_LOG_DIR
+              value: "/tmp/nextend/broker"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseG1GC -XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=65.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/nextend/broker"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 6933
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 6933
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5

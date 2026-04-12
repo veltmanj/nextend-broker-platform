@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nextend-broker-platform
+description: Nextend broker plus WebTransport sidecar deployment chart
+type: application
+version: 0.1.0
+appVersion: 1.0.0

@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nextend-broker-platform.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "nextend-broker-platform.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "nextend-broker-platform.fullname" . }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: broker
+          image: "{{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}"
+          imagePullPolicy: {{ .Values.broker.image.pullPolicy }}
+          env:
+            - name: APP_SECURITY_JWT_SKEY
+              value: {{ .Values.secrets.jwtSigningKey | quote }}
+            - name: APP_SECURITY_JWT_ISSUER
+              value: {{ .Values.broker.env.jwtIssuer | quote }}
+            - name: BROKER_H3_ENABLED
+              value: "true"
+            - name: BROKER_H3_PORT
+              value: {{ .Values.broker.service.h3Port | quote }}
+            - name: BROKER_H3_PATH
+              value: {{ .Values.broker.env.h3Path | quote }}
+            - name: BROKER_WEBTRANSPORT_ENABLED
+              value: "true"
+            - name: BROKER_WEBTRANSPORT_BACKEND
+              value: chromium-quiche
+            - name: BROKER_WEBTRANSPORT_PORT
+              value: {{ .Values.sidecar.service.webtransportPort | quote }}
+            - name: BROKER_WEBTRANSPORT_PATH
+              value: {{ .Values.broker.env.webtransportPath | quote }}
+            - name: BROKER_SIDECAR_MODE
+              value: {{ .Values.broker.env.sidecarMode | quote }}
+            - name: BROKER_SIDECAR_ADMIN_URL
+              value: {{ .Values.broker.env.sidecarAdminUrl | quote }}
+          ports:
+            - name: h3
+              containerPort: {{ .Values.broker.service.h3Port }}
+              protocol: UDP
+            - name: management
+              containerPort: {{ .Values.broker.service.managementPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: management
+          resources:
+{{ toYaml .Values.resources.broker | indent 12 }}
+        - name: sidecar
+          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
+          imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
+          env:
+            - name: HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: {{ .Values.sidecar.service.webtransportPort | quote }}
+            - name: SESSION_PATH
+              value: {{ .Values.broker.env.webtransportPath | quote }}
+            - name: BROKER_URL
+              value: h3://127.0.0.1:{{ .Values.broker.service.h3Port }}{{ .Values.broker.env.h3Path }}
+            - name: BROKER_REJECT_UNAUTHORIZED
+              value: "false"
+            - name: CERT_PATH
+              value: {{ .Values.secrets.tlsCertPath | quote }}
+            - name: KEY_PATH
+              value: {{ .Values.secrets.tlsKeyPath | quote }}
+            - name: SIDECAR_ADMIN_HOST
+              value: 127.0.0.1
+            - name: SIDECAR_ADMIN_PORT
+              value: {{ .Values.sidecar.service.adminPort | quote }}
+            - name: SIDECAR_CONTRACT_VERSION
+              value: {{ .Values.sidecar.env.contractVersion | quote }}
+          ports:
+            - name: wt
+              containerPort: {{ .Values.sidecar.service.webtransportPort }}
+              protocol: UDP
+            - name: admin
+              containerPort: {{ .Values.sidecar.service.adminPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+          resources:
+{{ toYaml .Values.resources.sidecar | indent 12 }}
+

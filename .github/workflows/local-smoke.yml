@@ -1,0 +1,18 @@
+name: Local Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  local-smoke:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Helm templates
+        run: bash scripts/check-helm-templates.sh
+      - name: Bootstrap broker local Maven prerequisites
+        run: bash scripts/bootstrap-broker-prereqs.sh
+      - name: Check broker local Maven prerequisites
+        run: bash scripts/check-broker-prereqs.sh
+      - name: Run Compose smoke test
+        run: bash scripts/compose-smoke-test.sh

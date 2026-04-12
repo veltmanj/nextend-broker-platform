@@ -1,0 +1,12 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: nextend-broker
+build:
+  artifacts:
+    - image: nextend/broker
+      jib:
+        project: nextend.nl:broker
+manifests:
+  rawYaml:
+    - k8s/k8s-broker-prod.yaml

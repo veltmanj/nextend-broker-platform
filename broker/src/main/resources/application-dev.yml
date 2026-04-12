@@ -1,0 +1,103 @@
+server:
+  port: ${PORT:6933}
+info:
+  description: broker
+  app:
+    encoding: UTF-8
+    source: 1.8
+    target: 1.8
+io:
+  rsocket:
+    broker:
+      uri: ws://localhost:6934
+      cluster:
+        enabled: true
+        uri: ws://localhost:6935
+      brokers:
+        broker-0:
+          uri: localhost
+          cluster:
+            enabled: true
+            uri: ws://localhost:6935
+        proxy: ws://localhost:6934
+
+logging:
+  level:
+    io:
+      rsocket: INFO
+spring:
+  application:
+    name: broker
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  cloud:
+    discovery:
+      enabled: false
+    config:
+      enabled: false
+management:
+  server:
+    port: 6933
+  endpoint:
+    shutdown:
+      enabled: ${MANAGEMENT_ENDPOINT_SHUTDOWN_ENABLED:false}
+    env:
+      post:
+        enabled: ${MANAGEMENT_ENDPOINT_ENV_POST_ENABLED:false}
+    health:
+      show-details: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:never}
+      probes:
+        enabled: true
+      show-components: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS:never}
+    refresh:
+      enabled: ${MANAGEMENT_ENDPOINT_REFRESH_ENABLED:false}
+    restart:
+      enabled: ${MANAGEMENT_ENDPOINT_RESTART_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,prometheus}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-0.eureka:8761/eureka
+    registryFetchIntervalSeconds: 5
+nextend:
+  broker:
+    h3:
+      enabled: ${BROKER_H3_ENABLED:true}
+      bind-address: ${BROKER_H3_BIND_ADDRESS:0.0.0.0}
+      port: ${BROKER_H3_PORT:7171}
+      path: ${BROKER_H3_PATH:/rsocket}
+    webtransport:
+      enabled: ${BROKER_WEBTRANSPORT_ENABLED:false}
+      backend: ${BROKER_WEBTRANSPORT_BACKEND:netty-experimental}
+      discovery-route-enabled: ${BROKER_WEBTRANSPORT_DISCOVERY_ROUTE_ENABLED:true}
+      auth-token-route-enabled: ${BROKER_WEBTRANSPORT_AUTH_TOKEN_ROUTE_ENABLED:true}
+      bind-address: ${BROKER_WEBTRANSPORT_BIND_ADDRESS:0.0.0.0}
+      port: ${BROKER_WEBTRANSPORT_PORT:7443}
+      path: ${BROKER_WEBTRANSPORT_PATH:/broker/wt}
+      auth-token-path: ${BROKER_WEBTRANSPORT_AUTH_TOKEN_PATH:/broker/auth/token}
+      idle-timeout: ${BROKER_WEBTRANSPORT_IDLE_TIMEOUT:30s}
+      startup-timeout: ${BROKER_WEBTRANSPORT_STARTUP_TIMEOUT:20s}
+      allowed-origins:
+        - ${BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_0:http://127.0.0.1:4200}
+        - ${BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_1:http://localhost:4200}
+      chromium-quiche:
+        mode: ${BROKER_WEBTRANSPORT_CHROMIUM_QUICHE_MODE:sidecar}
+        launch-mode: ${BROKER_SIDECAR_MODE:${BROKER_WEBTRANSPORT_CHROMIUM_QUICHE_LAUNCH_MODE:embedded}}
+        command: ${BROKER_WEBTRANSPORT_CHROMIUM_QUICHE_COMMAND:node ../sidecar/src/server.mjs}
+        admin-url: ${BROKER_SIDECAR_ADMIN_URL:${BROKER_WEBTRANSPORT_CHROMIUM_QUICHE_ADMIN_URL:http://127.0.0.1:9090}}
+        contract-version: ${BROKER_SIDECAR_CONTRACT_VERSION:${SIDECAR_CONTRACT_VERSION:1}}
+        library-path: ${BROKER_WEBTRANSPORT_CHROMIUM_QUICHE_LIBRARY_PATH:}
+app:
+  security:
+    jwt:
+      sKey: ${APP_SECURITY_JWT_SKEY}
+      issuer: ${APP_SECURITY_JWT_ISSUER:nextend-broker}
+      dashboard-token-validity: ${APP_SECURITY_JWT_DASHBOARD_TOKEN_VALIDITY:PT15M}

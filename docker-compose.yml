@@ -1,0 +1,72 @@
+services:
+  broker:
+    platform: linux/amd64
+    build:
+      context: ./broker
+      dockerfile: Dockerfile
+    image: ${BROKER_IMAGE}
+    depends_on:
+      sidecar:
+        condition: service_started
+    environment:
+      APP_SECURITY_JWT_SKEY: ${APP_SECURITY_JWT_SKEY}
+      APP_SECURITY_JWT_ISSUER: ${APP_SECURITY_JWT_ISSUER:-nextend-broker}
+      SPRING_CLOUD_CONFIG_ENABLED: ${SPRING_CLOUD_CONFIG_ENABLED:-false}
+      SPRING_CLOUD_DISCOVERY_ENABLED: ${SPRING_CLOUD_DISCOVERY_ENABLED:-false}
+      EUREKA_CLIENT_ENABLED: ${EUREKA_CLIENT_ENABLED:-false}
+      BROKER_H3_ENABLED: "true"
+      BROKER_H3_BIND_ADDRESS: 0.0.0.0
+      BROKER_H3_PORT: ${BROKER_H3_PORT:-7171}
+      BROKER_H3_PATH: ${BROKER_H3_PATH:-/rsocket}
+      BROKER_WEBTRANSPORT_ENABLED: "true"
+      BROKER_WEBTRANSPORT_BACKEND: chromium-quiche
+      BROKER_WEBTRANSPORT_PORT: ${BROKER_WEBTRANSPORT_PORT:-7443}
+      BROKER_WEBTRANSPORT_PATH: ${BROKER_WEBTRANSPORT_PATH:-/broker/wt}
+      BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_0: ${BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_0:-https://localhost}
+      BROKER_SIDECAR_MODE: ${BROKER_SIDECAR_MODE:-companion}
+      BROKER_SIDECAR_ADMIN_URL: ${BROKER_SIDECAR_ADMIN_URL:-http://sidecar:9090}
+    expose:
+      - "6933"
+      - "6934"
+      - "6935"
+    ports:
+      - "7171:7171/udp"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:6933/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  sidecar:
+    build:
+      context: ./sidecar
+      dockerfile: Dockerfile
+    image: ${SIDECAR_IMAGE}
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${BROKER_WEBTRANSPORT_PORT:-7443}
+      SESSION_PATH: ${BROKER_WEBTRANSPORT_PATH:-/broker/wt}
+      BROKER_URL: h3://broker:${BROKER_H3_PORT:-7171}${BROKER_H3_PATH:-/rsocket}
+      BROKER_REJECT_UNAUTHORIZED: "false"
+      CERT_PATH: ${CERT_PATH:-}
+      KEY_PATH: ${KEY_PATH:-}
+      SIDECAR_ADMIN_HOST: 0.0.0.0
+      SIDECAR_ADMIN_PORT: ${SIDECAR_ADMIN_PORT:-9090}
+      SIDECAR_CONTRACT_VERSION: ${SIDECAR_CONTRACT_VERSION:-1}
+    ports:
+      - "7443:7443/udp"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:9090/readyz').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  default:
+    name: nextend-broker-platform

@@ -1,0 +1,22 @@
+server:
+  port: ${PORT:6933}
+info:
+  description: broker
+  app:
+    encoding: UTF-8
+    source: 1.8
+    target: 1.8
+spring:
+  application:
+    name: broker
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  config:
+    activate:
+      on-profile:
+        - default
+  cloud:
+    config:
+      label: master
+      uri: http://localhost:8888
