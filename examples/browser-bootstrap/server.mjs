@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
@@ -22,6 +23,26 @@ const CONTENT_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
 };
+
+async function serveBundledApp(response) {
+  const result = await build({
+    absWorkingDir: ROOT_DIR,
+    bundle: true,
+    entryPoints: [join(ROOT_DIR, 'app.js')],
+    format: 'esm',
+    platform: 'browser',
+    sourcemap: 'inline',
+    target: ['chrome122', 'safari17'],
+    write: false,
+  });
+
+  const output = result.outputFiles[0];
+  response.writeHead(200, {
+    'cache-control': 'no-store',
+    'content-type': 'application/javascript; charset=utf-8',
+  });
+  response.end(output.text);
+}
 
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
@@ -82,6 +103,11 @@ async function requestHandler(request, response) {
   try {
     if ((request.url ?? '').startsWith('/broker/')) {
       await proxyBrokerRequest(request, response);
+      return;
+    }
+
+    if (request.url === '/app.js') {
+      await serveBundledApp(response);
       return;
     }
 

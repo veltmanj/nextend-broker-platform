@@ -1,12 +1,12 @@
 # Browser Bootstrap Example
 
-This example is a small browser frontend that reads the broker-platform bootstrap endpoints and then opens a real WebTransport session probe:
+This example is a small browser frontend that reads the broker-platform bootstrap endpoints and then connects with `rsocket-broker-client-js@0.0.32` over WebTransport:
 
 - `GET /broker/wt/info`
 - `GET /broker/auth/token`
-- `wts://.../broker/wt` session probe with one bidirectional stream and a minimal RSocket `SETUP` frame
+- `wts://.../broker/wt` session probe driven by `rsocket-broker-client-js@0.0.32`
 
-It does not require a build step. A tiny Node server is included so you can serve the page locally over HTTP and HTTPS and proxy `/broker/*` requests back to the broker management port.
+It does not require a separate frontend build command. A tiny Node server is included so you can serve the page locally over HTTP and HTTPS, proxy `/broker/*` requests back to the broker management port, and bundle the browser app from npm dependencies on demand with `esbuild`.
 
 ## Local usage
 
@@ -23,10 +23,16 @@ BROKER_WEBTRANSPORT_ALLOWED_ORIGIN_1=https://localhost:8443
 docker compose up --build
 ```
 
-1. Start the local example server:
+1. Install the example dependencies:
 
 ```bash
 cd examples/browser-bootstrap
+npm install
+```
+
+1. Start the local example server:
+
+```bash
 node server.mjs
 ```
 
@@ -45,10 +51,10 @@ BROKER_BASE_URL=http://localhost:16933 node server.mjs
 - issued JWT token
 - token expiry and scope
 - a composed launch URL you can pass into downstream client pages
-- a live WebTransport connectivity probe that opens a bidirectional stream and writes a minimal RSocket `SETUP` frame
+- a live WebTransport connectivity probe that connects with `rsocket-broker-client-js@0.0.32`
 
 ## Notes
 
-- The session probe validates browser-to-sidecar connectivity, stream creation, and broker acceptance of a minimal RSocket `SETUP` frame. It does not send request-response or request-stream application frames.
+- The session probe validates that `rsocket-broker-client-js@0.0.32` can open and close a WebTransport-backed RSocket connection against the broker platform.
 - `server.mjs` tries to generate a local self-signed certificate with `openssl` for the HTTPS listener if you do not provide `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH`.
 - If you only want the HTTP listener, start the server with `ENABLE_HTTPS=0 node server.mjs`.
