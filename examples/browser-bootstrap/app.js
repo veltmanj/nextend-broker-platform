@@ -21,6 +21,94 @@ const probeLogNode = document.querySelector('#probeLog');
 let latestInfo = null;
 let latestTokenResponse = null;
 let latestProbeLog = [];
+const encoder = new TextEncoder();
+
+function writeUInt16BE(target, offset, value) {
+  target[offset] = (value >>> 8) & 0xff;
+  target[offset + 1] = value & 0xff;
+  return offset + 2;
+}
+
+function writeUInt24BE(target, offset, value) {
+  target[offset] = (value >>> 16) & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+  target[offset + 2] = value & 0xff;
+  return offset + 3;
+}
+
+function writeUInt32BE(target, offset, value) {
+  target[offset] = (value >>> 24) & 0xff;
+  target[offset + 1] = (value >>> 16) & 0xff;
+  target[offset + 2] = (value >>> 8) & 0xff;
+  target[offset + 3] = value & 0xff;
+  return offset + 4;
+}
+
+function encodeAscii(value) {
+  return encoder.encode(value);
+}
+
+function concatUint8Arrays(parts) {
+  const totalLength = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const part of parts) {
+    combined.set(part, offset);
+    offset += part.byteLength;
+  }
+
+  return combined;
+}
+
+function createLengthPrefixedSetupFrame() {
+  const metadataMimeType = encodeAscii('application/octet-stream');
+  const dataMimeType = encodeAscii('application/octet-stream');
+  const frame = new Uint8Array(6 + 14 + metadataMimeType.byteLength + dataMimeType.byteLength);
+
+  let offset = 0;
+  offset = writeUInt32BE(frame, offset, 0);
+  offset = writeUInt16BE(frame, offset, 1 << 10);
+  offset = writeUInt16BE(frame, offset, 1);
+  offset = writeUInt16BE(frame, offset, 0);
+  offset = writeUInt32BE(frame, offset, 60_000);
+  offset = writeUInt32BE(frame, offset, 300_000);
+  offset = writeUInt8(frame, offset, metadataMimeType.byteLength);
+  frame.set(metadataMimeType, offset);
+  offset += metadataMimeType.byteLength;
+  offset = writeUInt8(frame, offset, dataMimeType.byteLength);
+  frame.set(dataMimeType, offset);
+
+  const lengthPrefixed = new Uint8Array(frame.byteLength + 3);
+  writeUInt24BE(lengthPrefixed, 0, frame.byteLength);
+  lengthPrefixed.set(frame, 3);
+  return lengthPrefixed;
+}
+
+function writeUInt8(target, offset, value) {
+  target[offset] = value & 0xff;
+  return offset + 1;
+}
+
+async function readOneChunkOrTimeout(reader, timeoutMs) {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ timedOut: true });
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([
+      reader.read().then((value) => ({ timedOut: false, value })),
+      timeoutPromise,
+    ]);
+    return result;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function setStatus(message, type = 'idle') {
   statusNode.textContent = message;
@@ -183,11 +271,28 @@ async function probeWebTransport() {
     appendProbeLog('Bidirectional stream opened.');
 
     const writer = stream.writable.getWriter();
+    const setupFrame = createLengthPrefixedSetupFrame();
+    await writer.write(setupFrame);
+    appendProbeLog('Wrote minimal RSocket SETUP frame.', {
+      bytes: setupFrame.byteLength,
+    });
     await writer.close();
     writer.releaseLock();
-    appendProbeLog('Closed outgoing stream without sending frames.');
+    appendProbeLog('Closed outgoing stream after SETUP frame.');
 
     const reader = stream.readable.getReader();
+    const readResult = await readOneChunkOrTimeout(reader, 750);
+
+    if (readResult.timedOut) {
+      appendProbeLog('No broker frame arrived before timeout. Treating transport as accepted.');
+    } else if (readResult.value.done) {
+      appendProbeLog('Incoming stream closed after setup frame.');
+    } else {
+      appendProbeLog('Received broker bytes after setup frame.', {
+        bytes: readResult.value.value.byteLength,
+      });
+    }
+
     await reader.cancel('probe complete');
     reader.releaseLock();
     appendProbeLog('Cancelled incoming stream reader.');
@@ -197,10 +302,10 @@ async function probeWebTransport() {
     appendProbeLog('Transport closed cleanly.');
 
     setProbeState(
-      'Success. Real session and bidirectional stream opened.',
+      'Success. Session opened and a minimal RSocket SETUP frame was accepted.',
       latestInfo.browserUrlHint
     );
-    setStatus('WebTransport probe succeeded.', 'success');
+    setStatus('WebTransport probe and setup frame succeeded.', 'success');
   } catch (error) {
     console.error(error);
     appendProbeLog('Probe failed.', {

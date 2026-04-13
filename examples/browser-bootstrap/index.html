@@ -90,8 +90,8 @@
       <h2>WebTransport Probe</h2>
       <p class="hint">
         This opens a real WebTransport session against the sidecar and creates one
-        bidirectional stream. It validates transport connectivity only and does not send
-        RSocket frames.
+        bidirectional stream. It then writes a minimal RSocket setup frame so the probe
+        validates transport connectivity and broker session acceptance.
       </p>
       <dl class="facts">
         <div>

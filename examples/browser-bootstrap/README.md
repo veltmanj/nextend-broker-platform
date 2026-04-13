@@ -4,7 +4,7 @@ This example is a small browser frontend that reads the broker-platform bootstra
 
 - `GET /broker/wt/info`
 - `GET /broker/auth/token`
-- `wts://.../broker/wt` session probe with one bidirectional stream
+- `wts://.../broker/wt` session probe with one bidirectional stream and a minimal RSocket `SETUP` frame
 
 It does not require a build step. A tiny Node server is included so you can serve the page locally over HTTP and HTTPS and proxy `/broker/*` requests back to the broker management port.
 
@@ -45,10 +45,10 @@ BROKER_BASE_URL=http://localhost:16933 node server.mjs
 - issued JWT token
 - token expiry and scope
 - a composed launch URL you can pass into downstream client pages
-- a live WebTransport connectivity probe that opens a bidirectional stream
+- a live WebTransport connectivity probe that opens a bidirectional stream and writes a minimal RSocket `SETUP` frame
 
 ## Notes
 
-- The session probe validates browser-to-sidecar connectivity and stream creation. It does not send application RSocket frames.
+- The session probe validates browser-to-sidecar connectivity, stream creation, and broker acceptance of a minimal RSocket `SETUP` frame. It does not send request-response or request-stream application frames.
 - `server.mjs` tries to generate a local self-signed certificate with `openssl` for the HTTPS listener if you do not provide `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH`.
 - If you only want the HTTP listener, start the server with `ENABLE_HTTPS=0 node server.mjs`.
